@@ -111,8 +111,8 @@ jobs:
       id: start_vm
       shell: pwsh
       run: | # have to start the VM to remove the VM extension if necessary https://github.com/terraform-providers/terraform-provider-azurerm/issues/6098
-        try { az vm start -g "${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" -n "${{ env.VM_NAME }}" }
-        catch { write-warning "VM ${{ env.VM_NAME }} not found in ${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" }
+        try \{ az vm start -g "${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" -n "${{ env.VM_NAME }}" \}
+        catch \{ write-warning "VM ${{ env.VM_NAME }} not found in ${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" \}
 
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v1
