@@ -9,7 +9,7 @@ terraform {
     resource_group_name  = "tfstate"
     storage_account_name = "tfstate"
     container_name       = "tfstate"
-    key                  = "${var.image_version}.tfstate"
+    key                  = "win2019.tfstate" #Notice hard coded image name
   }
 }
 
