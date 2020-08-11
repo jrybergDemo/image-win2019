@@ -1,0 +1,143 @@
+name: Images CI
+
+env:
+  IMAGE_NAME: win2019
+  LOCATION: usgovvirginia
+  ADMIN_USERNAME: xadmin
+  ADMIN_PASSWORD: '!A@S3d4f5g6h7j8k'
+  RG_PREFIX: ci-
+  DNS_LABEL_PREFIX: eitaas-
+  VM_NAME: vm
+  IMAGE_RG_NAME: ImageGallery
+
+on:
+  pull_request:
+    branches: [ develop ]
+    paths-ignore:
+    - 'README.md'
+    - 'LICENSE'
+    - 'runbooks/**'
+
+jobs:
+  gitversion:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Fetch tags for GitVersion
+      run: git fetch --prune --unshallow
+
+    - name: Setup Gitversion
+      uses: gittools/actions/gitversion/setup@v0.9.4
+      with:
+          versionSpec: '5.2.x'
+
+    - name: Use GitVersion
+      id: gitversion
+      uses: gittools/actions/gitversion/execute@v0.9.4
+
+    outputs:
+      SEM_VERSION: ${{ steps.gitversion.outputs.EscapedBranchName }}
+
+  packer:
+    needs: [gitversion]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Generate build time for ${{ env.IMAGE_NAME }}.${{ needs.gitversion.outputs.SEM_VERSION }}
+      id: gen_date
+      shell: pwsh
+      run: |
+        echo "::set-output name=gen_date::$(Get-Date -Format 'yyyyMMddHHmm')"
+
+    - name: Set Gov cloud for az cli
+      run: | # required until https://github.com/Azure/login/pull/13 merges (aug 2020)
+        az cloud set --name AzureUSGovernment
+        
+    - name: Connect to Azure
+      uses: azure/login@v1.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Check for image
+      id: image_check
+      shell: pwsh
+      run: |
+        $image = (ConvertFrom-Json ([string](az image list -g ImageGallery -o json))).name -eq '${{ env.IMAGE_NAME }}.${{ needs.gitversion.outputs.SEM_VERSION }}'
+        $image
+        echo "::set-output name=image_exists::$image"
+
+    - name: Packer Build
+      if: steps.image_check.outputs.image_exists == null
+      uses: operatehappy/packer-github-actions@v0.2.0
+      with:
+        command: build
+        arguments: "-color=false -force"
+        target: packer/${{ env.IMAGE_NAME }}.json
+      env:
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        LOCATION: ${{ env.LOCATION }}
+        GEN_DATE: ${{ steps.gen_date.outputs.gen_date }}
+        IMAGE_RG_NAME: ${{ env.IMAGE_RG_NAME }}
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        SEM_VERSION: ${{ needs.gitversion.outputs.SEM_VERSION }}
+
+    outputs:
+      gen_date: ${{ steps.gen_date.outputs.gen_date }}
+
+  terraform:
+    needs: [gitversion, packer]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set Gov cloud for az cli
+      run: | # required until https://github.com/Azure/login/pull/13 merges (aug 2020)
+        az cloud set --name AzureUSGovernment
+        
+    - name: Connect to Azure
+      uses: azure/login@v1.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Start VM
+      id: start_vm
+      shell: pwsh
+      run: | # have to start the VM to remove the VM extension if necessary https://github.com/terraform-providers/terraform-provider-azurerm/issues/6098
+        az vm start -g "${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" -n "${{ env.VM_NAME }}"
+
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v1
+
+    - name: Terraform
+      run: |
+        cd terraform
+        terraform init
+        terraform plan -no-color
+        terraform apply -auto-approve
+      env:
+        ARM_ACCESS_KEY: ${{ secrets.TFSTATE_STORAGE_ACCT_KEY }}
+        TF_VAR_location: ${{ env.LOCATION }}
+        TF_VAR_admin_username: ${{ env.ADMIN_USERNAME }}
+        TF_VAR_admin_password: ${{ env.ADMIN_PASSWORD }}
+        TF_VAR_rg_prefix: ${{ env.RG_PREFIX}}
+        TF_VAR_dns_label_prefix: ${{ env.DNS_LABEL_PREFIX }}
+        TF_VAR_image_rg_name: ${{ env.IMAGE_RG_NAME }}
+        TF_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+        TF_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+        TF_VAR_vm_name: ${{ env.VM_NAME }}
+        TF_VAR_image_name: ${{ env.IMAGE_NAME }}
+        TF_VAR_image_version: ${{ env.IMAGE_NAME }}.${{ needs.gitversion.outputs.SEM_VERSION }}
+        TF_VAR_azure_tags: "{
+          gen_date =\"${{ needs.packer.outputs.gen_date }}\",
+          image_ver=\"${{ env.IMAGE_NAME }}.${{ needs.gitversion.outputs.SEM_VERSION }}\"
+        }"
