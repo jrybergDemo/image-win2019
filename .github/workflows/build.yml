@@ -71,7 +71,7 @@ jobs:
         echo "::set-output name=image_exists::$image"
 
     - name: Packer Build
-      if: steps.image_check.outputs.image_exists == null
+      if: steps.image_check.outputs.image_exists == 'False'
       uses: operatehappy/packer-github-actions@v0.2.0
       with:
         command: build
