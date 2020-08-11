@@ -111,8 +111,8 @@ jobs:
       id: start_vm
       shell: pwsh
       run: | # have to start the VM to remove the VM extension if necessary https://github.com/terraform-providers/terraform-provider-azurerm/issues/6098
-        $vm = az vm show -g "${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" -n "${{ env.VM_NAME }}"
-        if ($vm) { az vm start -g "${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" -n "${{ env.VM_NAME }}" }
+        $vm = (az vm list -d -g "${{ env.RG_PREFIX}}${{ env.IMAGE_NAME }}" --query "[?powerState=='VM running'].id" -o tsv)
+        az vm start --ids $vm
 
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v1
