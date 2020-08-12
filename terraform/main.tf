@@ -37,17 +37,17 @@ data "azurerm_image" "image" {
 }
 
 resource "azurerm_windows_virtual_machine" "vm" {
-  name                             = var.vm_name
-  location                         = azurerm_resource_group.rg.location
-  resource_group_name              = azurerm_resource_group.rg.name
-  network_interface_ids            = [azurerm_network_interface.nic.id]
-  size                             = "Standard_D8s_v3"
-  tags                             = var.azure_tags
-  license_type                     = "Windows_Server"
-  admin_username                   = var.admin_username
-  admin_password                   = var.admin_password
-  provision_vm_agent               = true
-  source_image_id                  = data.azurerm_image.image.id
+  name                  = var.vm_name
+  location              = azurerm_resource_group.rg.location
+  resource_group_name   = azurerm_resource_group.rg.name
+  network_interface_ids = [azurerm_network_interface.nic.id]
+  size                  = "Standard_D8s_v3"
+  tags                  = var.azure_tags
+  license_type          = "Windows_Server"
+  admin_username        = var.admin_username
+  admin_password        = var.admin_password
+  provision_vm_agent    = true
+  source_image_id       = data.azurerm_image.image.id
 
   os_disk {
     name                 = "OsDisk"
