@@ -101,7 +101,7 @@ jobs:
     - name: Set Gov cloud for az cli
       run: | # required until https://github.com/Azure/login/pull/13 merges (aug 2020)
         az cloud set --name AzureUSGovernment
-        
+
     - name: Connect to Azure
       uses: azure/login@v1.1
       with:

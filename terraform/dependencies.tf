@@ -23,7 +23,7 @@ resource "azurerm_public_ip" "pip" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Dynamic"
-  domain_name_label   = "${var.dns_label_prefix}${var.image_name}"
+  domain_name_label   = lower("${var.dns_label_prefix}${var.image_name}")
 }
 
 resource "azurerm_network_security_group" "nsg" {
