@@ -66,7 +66,7 @@ jobs:
       id: image_check
       shell: pwsh
       run: |
-        $image = (ConvertFrom-Json ([string](az image list -g ImageGallery -o json))).name -eq '${{ env.IMAGE_NAME }}.${{ needs.gitversion.outputs.SEM_VERSION }}'
+        $image = (az image list -g ImageGallery --query "[?name=='${{ env.IMAGE_NAME }}.${{ needs.gitversion.outputs.SEM_VERSION }}']" -o tsv)
         $image
         echo "::set-output name=image_exists::$image"
 
